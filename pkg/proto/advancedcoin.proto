@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+option go_package = "BrunoCoin/pkg/proto";
+
+message TransactionInput {
+  string transaction_hash = 1; // Pointer to the transaction containing the UTXO to be spent
+  uint32 output_index = 2; // The index number of the UTXO to be spent, first one is 0
+  string unlocking_script = 3; // A script that fulfills the conditions of the UTXO locking-script
+  uint32 amount = 4;
+  // uint32 sequence_number = 4; // Currently-disabled Tx-replacement feature, set to 0xFFFFFFFF
+}
+
+message TransactionOutput {
+  uint32 amount = 1; // Bitcoin Value in Satoshis (10^-8 bitcoin)
+  string locking_script = 2; // A script defining the conditions needed to spend the output
+}
+
+message Transaction {
+  uint32 version = 1; // Specifies which rules this transaction follows
+  repeated TransactionInput inputs = 2; // One or more Transaction Inputs
+  repeated TransactionOutput outputs = 3; // One or more Transaction Outputs
+  uint32 lock_time = 4; // A unix timestamp or block number (pg 114)
+}
+
+message Block {
+  BlockHeader header = 1;
+  repeated Transaction transactions = 2; // The transactions recorded in this block
+}
+
+message BlockHeader {
+  uint32 version = 1; // A version number to track software/protocol upgrades
+  string prev_block_hash = 2; // A reference to the hash of the previous (parent) block in the chain
+  string merkle_root = 3; // A hash of the root of the Merkle-Tree of this block’s transactions
+  uint32 timestamp = 4; // The approximate creation time of this block (seconds from Unix Epoch)
+  string difficulty_target = 5; // The proof-of-work algorithm difficulty target for this block
+  uint32 nonce = 6; // A counter used for the proof-of-work algorithm
+}
+
+message Empty {}
+
+message VersionRequest {
+  uint32 version = 1; // a constant that defines the bitcoin P2P protocol version the client “speaks”
+  string addr_you = 2; // the IP address of the remote node as seen from this node
+  string addr_me = 3; // the IP address of the local node, as discovered by the local node
+  uint32 best_height = 4; // the block height of this node’s blockchain
+}
+
+message GetBlocksRequest {
+  string top_block_hash = 1; // the hash of the top block possessed
+  string addr_me = 2; // the IP address of the local node
+}
+
+// Also known as inv (inventory) (block_hashes should have a maximum size of 500)
+message GetBlocksResponse {
+  repeated string block_hashes = 1; // the hashes of all blocks above the given hash
+}
+
+message GetDataRequest {
+  string block_hash = 1; // the hash of the requested block
+}
+
+message GetDataResponse {
+  Block block = 1; // requested block
+}
+
+message Address {
+  string addr = 1; // actual address
+  uint32 last_seen = 2; // A unix timestamp or block number (pg 114)
+}
+
+message Addresses {
+  repeated Address addrs = 1; // array of known neighbor addresses
+}
+
+service BrunoCoin {
+  rpc ForwardTransaction(Transaction) returns (Empty);
+  rpc ForwardBlock(Block) returns (Empty);
+  // Establishes a one way connection to a node (may be reciprocated)
+  rpc Version(VersionRequest) returns (Empty);
+  // Gets maximum 500 blocks past block with top hash
+  rpc GetBlocks(GetBlocksRequest) returns (GetBlocksResponse);
+  // Get a single block
+  rpc GetData(GetDataRequest) returns (GetDataResponse);
+  // Sends know addresses to neighbors, forwarded from node to node
+  rpc SendAddresses(Addresses) returns (Empty);
+  // Gets neighbor addresses from node (can be multicast with static addr_me)
+  rpc GetAddresses(Empty) returns (Addresses);
+}
